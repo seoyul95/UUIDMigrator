@@ -1,0 +1,16 @@
+name: FullDataRestore
+main: me.server.fulldatabackup.FullDataRestore
+version: 1.0
+api-version: 1.16
+
+authors:
+  - YourName
+
+description: "Restores cracked player inventory, advancements/achievements, stats, and even skin from the online UUID profile. Intended for Paper 1.21.11 in offline mode."
+
+commands:
+  restoreall:
+    description: "Attempt to restore data and skins for every offline player file in the world folder"
+    usage: "/<command>"
+    permission: fulldatarestore.restoreall
+    permission-message: "You don't have permission to run this command."
