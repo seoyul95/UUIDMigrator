@@ -4,6 +4,7 @@ A Bukkit/Paper plugin for offline servers that
 copies online‑mode player data (inventory, advancements, stats) and
 applies the correct skin texture for cracked players. Includes a `/restoreall`
 command and automatic processing on enable.
+This was made by ChatGpt
 
 ## Usage
 1. Build with Maven: `mvn clean package`.
