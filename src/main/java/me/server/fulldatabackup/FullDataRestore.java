@@ -5,6 +5,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -13,6 +14,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -50,6 +52,29 @@ public class FullDataRestore extends JavaPlugin implements Listener, org.bukkit.
         getLogger().info("Full Data Restore Plugin Enabled");
         // automatically attempt to restore any preexisting cracked data
         restoreAll(null);
+        // note: restoreAll logs "done" when finished
+    }
+
+    @Override
+    public void onDisable() {
+        // save players/worlds before shutdown so no in-memory changes are lost
+        try {
+            Bukkit.getServer().savePlayers();
+            Bukkit.getWorlds().forEach(w -> w.save());
+        } catch (Exception ignored) {
+            // just attempt; failures logged by Bukkit itself
+        }
+
+        // if the server is shutting down while someone has just had their
+        // files copied but hasn't yet been kicked, make sure we disconnect them
+        // now so the restored data isn't overwritten by their old in-memory state
+        for (UUID u : restored) {
+            Player p = Bukkit.getPlayer(u);
+            if (p != null && p.isOnline()) {
+                p.kickPlayer("§aServer is shutting down; please rejoin to load restored data");
+            }
+        }
+        getLogger().info("Full Data Restore Plugin Disabled");
     }
 
     @EventHandler
@@ -115,6 +140,33 @@ public class FullDataRestore extends JavaPlugin implements Listener, org.bukkit.
             }
         }, 60L);
     }
+
+@EventHandler
+public void onPreLogin(AsyncPlayerPreLoginEvent e) {
+    String name = e.getName();
+    UUID crackedUUID = e.getUniqueId();
+
+    try {
+        UUID onlineUUID = lookupRealUUID(name);
+        if (onlineUUID == null) {
+            getLogger().info("No premium UUID for " + name);
+            return;
+        }
+
+        getLogger().info("Resolved " + name + " -> " + onlineUUID);
+
+        boolean copied = restoreFiles(onlineUUID, crackedUUID);
+
+        if (copied) {
+            getLogger().info("Pre-login restore complete for " + name);
+        }
+
+        fetchSkin(crackedUUID, name);
+
+    } catch (Exception ex) {
+        getLogger().warning("PreLogin restore error: " + ex.getMessage());
+    }
+}
 
     // ---------------- helper methods ----------------
 
@@ -188,6 +240,7 @@ public class FullDataRestore extends JavaPlugin implements Listener, org.bukkit.
                 if (sender != null) {
                     sender.sendMessage("§aRestore process initiated for all offline player files.");
                 }
+                getLogger().info("restoreall complete: done");
             } catch (Exception e) {
                 if (sender != null) {
                     sender.sendMessage("§cError during restoreall: " + e.getMessage());
